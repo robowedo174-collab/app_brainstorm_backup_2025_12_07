@@ -922,8 +922,7 @@ def main():
 
                         sched = st.session_state.schedule_by_day[d_num]
                         for slot_index, item in enumerate(sched):
-                            col_time,col_content, col_edit = st.columns([0.7, 0.15])
-                            with col_time:
+                            col_time,col_content, col_edit = st.columns([0.15, 0.7, 0.15])                            with col_time:
                                 st.text(item.get("time", ""))
                             with col_content:
                                 if "fixed" in item:
