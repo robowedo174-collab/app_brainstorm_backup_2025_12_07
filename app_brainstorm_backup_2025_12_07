@@ -677,7 +677,68 @@ def init_session_state():
             "preset_name": list(PRESETS.keys())[0],
             "pro_core": list(PRO_CORES.keys())[0],
             "pro_engine": list(PRO_ENGINES.keys())[0],
+        st.session_state.edit_day = None
+        st.session_state.edit_slot_index = None
         }
+
+# ==============================================================================
+# VII.a. РЕДАКТОР ОДНОЙ АКТИВНОСТИ (ручной режим)
+# ==============================================================================
+
+def start_edit_activity(day_num: int, slot_index: int):
+    """Запоминаем, какой слот редактируем."""
+    st.session_state.edit_day = day_num
+    st.session_state.edit_slot_index = slot_index
+
+def clear_edit_activity():
+    st.session_state.edit_day = None
+    st.session_state.edit_slot_index = None
+
+def render_activity_editor():
+    """Форма для ручного редактирования выбранной активности."""
+    day_num = st.session_state.get("edit_day")
+    slot_index = st.session_state.get("edit_slot_index")
+
+    if day_num is None or slot_index is None:
+        return
+
+    sched = st.session_state.schedule_by_day.get(day_num, [])
+    if slot_index < 0 or slot_index >= len(sched):
+        return
+    slot = sched[slot_index]
+    if slot.get("type") != "ai":
+        return
+
+    data = slot.get("data", {})
+
+    st.markdown("---")
+    st.subheader(f"✈️ Редактор активности — День {day_num}, слот {slot.get('time', '')}")
+
+    title = st.text_input("Название", data.get("Название", ""), key="edit_title")
+    goal = st.text_area("Цель", data.get("Цель", ""), key="edit_goal")
+    equipment = st.text_area("Оборудование", data.get("Оборудование", ""), key="edit_equipment")
+    instruction = st.text_area("Инструкция (для ведущего)", data.get("Инструкция", ""), key="edit_instruction")
+    result = st.text_area("Результат для ребёнка", data.get("Результат", ""), key="edit_result")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("💾 Сохранить изменения", key="btn_save_activity"):
+            slot["data"] = {
+                "Название": title.strip() or "Активность",
+                "Цель": goal.strip(),
+                "Оборудование": equipment.strip(),
+                "Инструкция": instruction.strip(),
+                "Результат": result.strip(),
+            }
+            sched[slot_index] = slot
+            st.session_state.schedule_by_day[day_num] = sched
+            clear_edit_activity()
+            st.success("Изменения сохранены.")
+            st.experimental_rerun()
+    with col2:
+        if st.button("Отмена", key="btn_cancel_activity"):
+            clear_edit_activity()
+            st.experimental_rerun()
 
 
 def main():
@@ -860,8 +921,8 @@ def main():
                             generate_day_schedule(day_meta)
 
                         sched = st.session_state.schedule_by_day[d_num]
-                        for item in sched:
-                            col_time, col_content = st.columns([0.15, 0.85])
+                        for slot_index, item in enumerate(sched):
+                            col_time,col_content, col_edit = st.columns([0.7, 0.15])
                             with col_time:
                                 st.text(item.get("time", ""))
                             with col_content:
@@ -883,6 +944,15 @@ def main():
                                         st.markdown(
                                             f"**✅ Результат:** {data.get('Результат', '-')}"
                                         )
+            with col_edit:
+                if item.get("type") == "ai":
+                    if st.button("✏️ Редактировать", key=f"edit_{d_num}_{slot_index}"):
+                        start_edit_activity(d_num, slot_index)
+                        st.experimental_rerun()
+
+            # После всех вкладок дней — рендерим редактор, если что-то выбрано
+            render_activity_editor()
+
 
 
 if __name__ == "__main__":
